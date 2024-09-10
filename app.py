@@ -1,129 +1,193 @@
-import spaces
-import gradio as gr
-from huggingface_hub import InferenceClient
-from torch import nn
-from transformers import AutoModel, AutoProcessor, AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast, AutoModelForCausalLM
-from pathlib import Path
-import torch
-import torch.amp.autocast_mode
-from PIL import Image
 import os
+import torch
+import argparse
+from pathlib import Path
+import logging
+import gradio as gr
+import numpy as np
 
+from models import load_clip, load_model, load_image_adapter
+from image_processing import prepare_images, process_images
+from text_processing import (tokenize_prompt, embed_prompt, embed_bos_token,
+                             construct_input_tensors, decode_generated_ids,
+                             set_vlm_prompt, get_vlm_prompt,
+                             set_negative_vlm_prompt, get_negative_vlm_prompt)
+from batch_processing import batch_process_images, interrupt_batch_processing
+from utils import is_cuda_out_of_memory_error
+from gradio_ui import create_ui, launch_ui
 
+# Constants
 CLIP_PATH = "google/siglip-so400m-patch14-384"
-VLM_PROMPT = "A descriptive caption for this image:\n"
-MODEL_PATH = "meta-llama/Meta-Llama-3.1-8B"
 CHECKPOINT_PATH = Path("wpkklhc6")
-TITLE = "<h1><center>JoyCaption Pre-Alpha (2024-07-30a)</center></h1>"
-
 HF_TOKEN = os.environ.get("HF_TOKEN", None)
+ORIGINAL_MODEL_PATH = "meta-llama/Meta-Llama-3.1-8B"
+QUANTIZED_MODEL_PATH = "unsloth/Meta-Llama-3.1-8B-bnb-4bit"
 
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
-class ImageAdapter(nn.Module):
-	def __init__(self, input_features: int, output_features: int):
-		super().__init__()
-		self.linear1 = nn.Linear(input_features, output_features)
-		self.activation = nn.GELU()
-		self.linear2 = nn.Linear(output_features, output_features)
-	
-	def forward(self, vision_outputs: torch.Tensor):
-		x = self.linear1(vision_outputs)
-		x = self.activation(x)
-		x = self.linear2(x)
-		return x
+# Global variables to store loaded models
+clip_processor = None
+clip_model = None
+tokenizer = None
+text_model = None
+image_adapter = None
 
-
-# Load CLIP
-print("Loading CLIP")
-clip_processor = AutoProcessor.from_pretrained(CLIP_PATH)
-clip_model = AutoModel.from_pretrained(CLIP_PATH)
-clip_model = clip_model.vision_model
-clip_model.eval()
-clip_model.requires_grad_(False)
-clip_model.to("cuda")
-
-
-# Tokenizer
-print("Loading tokenizer")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, use_fast=False)
-assert isinstance(tokenizer, PreTrainedTokenizer) or isinstance(tokenizer, PreTrainedTokenizerFast), f"Tokenizer is of type {type(tokenizer)}"
-
-# LLM
-print("Loading LLM")
-text_model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, device_map="auto", torch_dtype=torch.bfloat16)
-text_model.eval()
-
-# Image Adapter
-print("Loading image adapter")
-image_adapter = ImageAdapter(clip_model.config.hidden_size, text_model.config.hidden_size)
-image_adapter.load_state_dict(torch.load(CHECKPOINT_PATH / "image_adapter.pt", map_location="cpu"))
-image_adapter.eval()
-image_adapter.to("cuda")
-
-
-@spaces.GPU()
 @torch.no_grad()
-def stream_chat(input_image: Image.Image):
-	torch.cuda.empty_cache()
+def stream_chat(input_images, vlm_prompt=None, negative_vlm_prompt=None, seed=-1, max_new_tokens=300, length_penalty=1.0, num_beams=1):
+    """
+    Generate captions for the given input images using the loaded models.
 
-	# Preprocess image
-	image = clip_processor(images=input_image, return_tensors='pt').pixel_values
-	image = image.to('cuda')
+    Args:
+    input_images (list): List of input images
+    vlm_prompt (str, optional): Custom VLM prompt to use. If None, use the default.
+    negative_vlm_prompt (str, optional): Custom negative VLM prompt to use. If None, no negative prompt is used.
+    seed (int, optional): Random seed for generation. If -1, a random seed will be used.
+    max_new_tokens (int, optional): Maximum number of new tokens to generate. Default is 300.
+    length_penalty (float, optional): Encourages (>1.0) or discourages (<1.0) longer sequences. Default is 1.0.
+    num_beams (int, optional): Number of beams for beam search. Default is 1.
 
-	# Tokenize the prompt
-	prompt = tokenizer.encode(VLM_PROMPT, return_tensors='pt', padding=False, truncation=False, add_special_tokens=False)
+    Returns:
+    str: Generated captions or error message
+    """
+    global clip_processor, clip_model, tokenizer, text_model, image_adapter
+    
+    if not all([clip_processor, clip_model, tokenizer, text_model, image_adapter]):
+        return "Error: Models not loaded. Please load a model first."
 
-	# Embed image
-	with torch.amp.autocast_mode.autocast('cuda', enabled=True):
-		vision_outputs = clip_model(pixel_values=image, output_hidden_states=True)
-		image_features = vision_outputs.hidden_states[-2]
-		embedded_images = image_adapter(image_features)
-		embedded_images = embedded_images.to('cuda')
-	
-	# Embed prompt
-	prompt_embeds = text_model.model.embed_tokens(prompt.to('cuda'))
-	assert prompt_embeds.shape == (1, prompt.shape[1], text_model.config.hidden_size), f"Prompt shape is {prompt_embeds.shape}, expected {(1, prompt.shape[1], text_model.config.hidden_size)}"
-	embedded_bos = text_model.model.embed_tokens(torch.tensor([[tokenizer.bos_token_id]], device=text_model.device, dtype=torch.int64))
+    torch.cuda.empty_cache()
 
-	# Construct prompts
-	inputs_embeds = torch.cat([
-		embedded_bos.expand(embedded_images.shape[0], -1, -1),
-		embedded_images.to(dtype=embedded_bos.dtype),
-		prompt_embeds.expand(embedded_images.shape[0], -1, -1),
-	], dim=1)
+    if seed != -1:
+        torch.manual_seed(seed)
+        np.random.seed(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
 
-	input_ids = torch.cat([
-		torch.tensor([[tokenizer.bos_token_id]], dtype=torch.long),
-		torch.zeros((1, embedded_images.shape[1]), dtype=torch.long),
-		prompt,
-	], dim=1).to('cuda')
-	attention_mask = torch.ones_like(input_ids)
+    # Set the VLM prompt and negative prompt if provided
+    if vlm_prompt is not None:
+        set_vlm_prompt(vlm_prompt)
+    if negative_vlm_prompt is not None:
+        set_negative_vlm_prompt(negative_vlm_prompt)
 
-	#generate_ids = text_model.generate(input_ids, inputs_embeds=inputs_embeds, attention_mask=attention_mask, max_new_tokens=300, do_sample=False, suppress_tokens=None)
-	generate_ids = text_model.generate(input_ids, inputs_embeds=inputs_embeds, attention_mask=attention_mask, max_new_tokens=300, do_sample=True, top_k=10, temperature=0.5, suppress_tokens=None)
+    # Tokenize and embed text
+    prompt, negative_prompt = tokenize_prompt(tokenizer)
+    prompt_embeds, negative_prompt_embeds = embed_prompt(text_model, prompt, negative_prompt)
+    embedded_bos = embed_bos_token(text_model, tokenizer)
 
-	# Trim off the prompt
-	generate_ids = generate_ids[:, input_ids.shape[1]:]
-	if generate_ids[0][-1] == tokenizer.eos_token_id:
-		generate_ids = generate_ids[:, :-1]
+    # Prepare and process images
+    numpy_images = prepare_images(input_images)
+    pixel_values = process_images(clip_processor, numpy_images)
 
-	caption = tokenizer.batch_decode(generate_ids, skip_special_tokens=False, clean_up_tokenization_spaces=False)[0]
+    # Process images with CLIP and image adapter
+    with torch.amp.autocast('cuda', enabled=True):
+        vision_outputs = clip_model(pixel_values=pixel_values, output_hidden_states=True)
+        image_features = vision_outputs.hidden_states[-2]
+        embedded_images = image_adapter(image_features)
+        embedded_images = embedded_images.to()
 
-	return caption.strip()
+    # Construct input tensors
+    inputs_embeds, input_ids, attention_mask, negative_inputs_embeds, negative_input_ids, negative_attention_mask = construct_input_tensors(
+        embedded_bos, embedded_images, prompt_embeds, negative_prompt_embeds, tokenizer, prompt, negative_prompt
+    )
 
+    # Generate captions
+    generate_kwargs = {
+        "input_ids": input_ids,
+        "inputs_embeds": inputs_embeds,
+        "attention_mask": attention_mask,
+        "max_new_tokens": max_new_tokens,
+        "do_sample": True,
+        "top_k": 10,
+        "temperature": 0.5,
+        "suppress_tokens": None,
+        "length_penalty": length_penalty,
+        "num_beams": num_beams
+    }
 
-with gr.Blocks() as demo:
-	gr.HTML(TITLE)
-	with gr.Row():
-		with gr.Column():
-			input_image = gr.Image(type="pil", label="Input Image")
-			run_button = gr.Button("Caption")
-		
-		with gr.Column():
-			output_caption = gr.Textbox(label="Caption")
-	
-	run_button.click(fn=stream_chat, inputs=[input_image], outputs=[output_caption])
+    if negative_inputs_embeds is not None:
+        generate_kwargs["negative_prompt_ids"] = negative_input_ids
+        generate_kwargs["negative_prompt_attention_mask"] = negative_attention_mask
 
+    generate_ids = text_model.generate(**generate_kwargs)
+
+    # Decode generated IDs into captions
+    captions = decode_generated_ids(tokenizer, generate_ids, input_ids)
+
+    return captions
+
+def load_selected_model(model_type, custom_model_url=""):
+    """
+    Load the selected model type and initialize global model variables.
+    Ensures previous models are unloaded before loading new ones.
+
+    Args:
+    model_type (str): Type of model to load ("Original", "4-bit Quantized", or "Custom")
+    custom_model_url (str): URL of the custom model (used when model_type is "Custom")
+
+    Returns:
+    str: Status message indicating success or failure of model loading
+    """
+    global clip_processor, clip_model, tokenizer, text_model, image_adapter
+    
+    # Unload previous models
+    if clip_model is not None:
+        del clip_model
+    if text_model is not None:
+        del text_model
+    if image_adapter is not None:
+        del image_adapter
+    
+    # Clear CUDA cache
+    torch.cuda.empty_cache()
+    
+    try:
+        # Load CLIP model
+        logger.info("Starting CLIP model loading")
+        clip_processor, clip_model = load_clip()
+        
+        # Load selected LLM and tokenizer
+        logger.info(f"Starting {model_type} model loading")
+        if model_type == "Custom":
+            if not custom_model_url:
+                return "Error: Custom model URL is required for Custom model type"
+            tokenizer, text_model = load_model(custom_model_url, use_4bit=False)
+        else:
+            model_path = QUANTIZED_MODEL_PATH if model_type == "4-bit Quantized" else ORIGINAL_MODEL_PATH
+            tokenizer, text_model = load_model(model_path, use_4bit=(model_type == "4-bit Quantized"))
+        
+        # Load image adapter
+        logger.info("Starting image adapter loading")
+        image_adapter = load_image_adapter(clip_model, text_model, CHECKPOINT_PATH)
+        
+        logger.info("All models loaded successfully")
+        return f"Successfully loaded {model_type} model"
+    except Exception as e:
+        logger.error(f"Error loading model: {str(e)}")
+        return f"Error loading model: {str(e)}"
+    finally:
+        # Clear CUDA cache again after loading
+        torch.cuda.empty_cache()
+
+def main():
+    """
+    Main function to set up and run the JoyCaption application.
+    Parses command-line arguments, creates the UI, and launches the application.
+    """
+    parser = argparse.ArgumentParser(description="Run the JoyCaption demo")
+    parser.add_argument("--listen", action="store_true", help="Listen on all interfaces")
+    args = parser.parse_args()
+
+    # Create Gradio UI
+    demo = create_ui(
+        stream_chat_func=stream_chat,
+        batch_process_images_func=lambda input_folder, batch_size, seed, max_new_tokens, length_penalty, num_beams: batch_process_images(input_folder, batch_size, stream_chat, seed, max_new_tokens, length_penalty, num_beams),
+        interrupt_batch_processing_func=interrupt_batch_processing,
+        load_model_func=load_selected_model
+    )
+
+    # Launch UI
+    launch_ui(demo, args)
 
 if __name__ == "__main__":
-    demo.launch()
+    main()

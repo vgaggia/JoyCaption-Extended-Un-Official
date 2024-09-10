@@ -1,5 +1,10 @@
-huggingface_hub==0.24.3
 accelerate
-torch
-transformers==4.43.3
+wheel
+bitsandbytes
+gradio
+huggingface-hub
+numpy
+Pillow
+transformers
 sentencepiece
+protobuf
