@@ -29,9 +29,12 @@ JoyCaption is an image captioning application that uses advanced AI models to ge
    ```
    This script will create a virtual environment and install the necessary dependencies.
 
-3. Install PyTorch:
+4. Install PyTorch:
    Open CMD and type nvcc --version
    Visit https://pytorch.org/get-started/locally/ and follow the instructions to install PyTorch with the appropriate CUDA version for your system.
+
+5. Download JoyCaption image_adapter.pt from https://huggingface.co/spaces/fancyfeast/joy-caption-pre-alpha/tree/main/wpkklhc6
+   Place it in the folder named "wpkklhc6"
 
 ## Usage
 
