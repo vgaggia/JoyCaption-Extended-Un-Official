@@ -19,8 +19,8 @@ JoyCaption is an image captioning application that uses advanced AI models to ge
 ### Setup
 1. Clone this repository:
    ```
-   git clone https://github.com/your-username/joy-caption-pre-alpha.git
-   cd joy-caption-pre-alpha
+   git clone https://github.com/vgaggia/JoyCaption-Extended-Un-Official
+   cd JoyCaption-Extended-Un-Official
    ```
 
 2. Run the installation script:
