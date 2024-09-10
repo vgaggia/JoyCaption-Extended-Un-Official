@@ -66,10 +66,10 @@ This will launch the Gradio interface, where you can:
 This project is licensed under the MIT License.
 
 ## Acknowledgements
-This project is based on the original work by [\[Fancy Feast\]](https://huggingface.co/fancyfeast), with significant modifications and improvements. The original project was also released under the MIT License.
+This project is based on the original work by [Fancy Feast](https://huggingface.co/fancyfeast), with significant modifications and improvements. The original project was also released under the MIT License.
 
 ## Disclaimer
 This is a un-official pre-alpha version and may contain bugs or unfinished features. Use at your own risk.
 
 ## Troubleshooting
-If you encounter any issues with model loading or CUDA compatibility, ensure that you have installed the correct version of PyTorch for your CUDA setup. You can check your CUDA version by running `nvidia-smi` in the command prompt as well as "nvcc --version" to make sure you have cuda toolkit installed.
+If you encounter any issues with model loading or CUDA compatibility, ensure that you have installed the correct version of PyTorch for your CUDA setup. You can check your CUDA version by running `nvidia-smi` in the command prompt as well as `nvcc --version` to make sure you have cuda toolkit installed.
