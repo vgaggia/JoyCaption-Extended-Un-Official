@@ -33,6 +33,12 @@ JoyCaption is an image captioning application that uses advanced AI models to ge
    Open CMD and type nvcc --version
    Make sure to cd into the new directory that you cloned "JoyCaption-Extended-Un-Official, and then type venv\scripts\active, before installing pytorch, make sure to use that command if you need to add stuff like pytorch in the future.
    Visit https://pytorch.org/get-started/locally/ and follow the instructions to install PyTorch with the appropriate CUDA version for your system.
+   ```
+   cd JoyCaption-Extended-Un-Official
+   venv\scripts\activate
+   (PYTORCH PIP3 INSTALL COMMAND FROM THE LINK ABOVE)
+   ```
+
 
 6. Download JoyCaption image_adapter.pt from https://huggingface.co/spaces/fancyfeast/joy-caption-pre-alpha/tree/main/wpkklhc6
    Place it in the folder named "wpkklhc6"
