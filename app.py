@@ -5,6 +5,7 @@ from pathlib import Path
 import logging
 import gradio as gr
 import numpy as np
+from functools import partial
 
 from models import load_clip, load_model, load_image_adapter
 from image_processing import prepare_images, process_images
@@ -181,7 +182,11 @@ def main():
     # Create Gradio UI
     demo = create_ui(
         stream_chat_func=stream_chat,
-        batch_process_images_func=lambda input_folder, batch_size, seed, max_new_tokens, length_penalty, num_beams: batch_process_images(input_folder, batch_size, stream_chat, seed, max_new_tokens, length_penalty, num_beams),
+        batch_process_images_func=lambda input_folder, batch_size, seed, max_new_tokens, length_penalty, num_beams: batch_process_images(
+            input_folder,
+            batch_size,
+            partial(stream_chat, seed=seed, max_new_tokens=max_new_tokens, length_penalty=length_penalty, num_beams=num_beams)
+        ),
         interrupt_batch_processing_func=interrupt_batch_processing,
         load_model_func=load_selected_model
     )
