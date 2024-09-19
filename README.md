@@ -4,7 +4,6 @@
 JoyCaption is an image captioning application that uses advanced AI models to generate descriptive captions for images. This project is a heavily modified version of an original repository, adapted to use more recent models and technologies.
 
 ## Features
-- Image captioning using state-of-the-art AI models
 - Batch processing capabilities for multiple images
 - User-friendly Gradio interface
 - Support for different CUDA versions and CPU-only setups
@@ -19,8 +18,8 @@ JoyCaption is an image captioning application that uses advanced AI models to ge
 ### Setup
 1. Clone this repository:
    ```
-   git clone https://github.com/your-username/joy-caption-pre-alpha.git
-   cd joy-caption-pre-alpha
+   git clone https://github.com/vgaggia/JoyCaption-Extended-Un-Official
+   cd JoyCaption-Extended-Un-Official
    ```
 
 2. Run the installation script:
@@ -29,9 +28,19 @@ JoyCaption is an image captioning application that uses advanced AI models to ge
    ```
    This script will create a virtual environment and install the necessary dependencies.
 
-3. Install PyTorch:
+4. Install PyTorch:
    Open CMD and type nvcc --version
+   Make sure to cd into the new directory that you cloned "JoyCaption-Extended-Un-Official, and then type venv\scripts\active, before installing pytorch, make sure to use that command if you need to add stuff like pytorch in the future.
    Visit https://pytorch.org/get-started/locally/ and follow the instructions to install PyTorch with the appropriate CUDA version for your system.
+   ```
+   cd JoyCaption-Extended-Un-Official
+   venv\scripts\activate
+   (PYTORCH PIP3 INSTALL COMMAND FROM THE LINK ABOVE)
+   ```
+
+
+6. Download JoyCaption image_adapter.pt from https://huggingface.co/spaces/fancyfeast/joy-caption-pre-alpha/tree/main/wpkklhc6
+   Place it in the folder named "wpkklhc6"
 
 ## Usage
 
@@ -66,10 +75,10 @@ This will launch the Gradio interface, where you can:
 This project is licensed under the MIT License.
 
 ## Acknowledgements
-This project is based on the original work by [\[Original Author\]](https://huggingface.co/fancyfeast), with significant modifications and improvements. The original project was also released under the MIT License.
+This project is based on the original work by [Fancy Feast](https://huggingface.co/fancyfeast), with significant modifications and improvements. The original project was also released under the MIT License.
 
 ## Disclaimer
 This is a un-official pre-alpha version and may contain bugs or unfinished features. Use at your own risk.
 
 ## Troubleshooting
-If you encounter any issues with model loading or CUDA compatibility, ensure that you have installed the correct version of PyTorch for your CUDA setup. You can check your CUDA version by running `nvidia-smi` in the command prompt as well as "nvcc --version" to make sure you have cuda toolkit installed.
+If you encounter any issues with model loading or CUDA compatibility, ensure that you have installed the correct version of PyTorch for your CUDA setup. You can check your CUDA version by running `nvidia-smi` in the command prompt as well as `nvcc --version` to make sure you have cuda toolkit installed.
