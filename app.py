@@ -50,12 +50,12 @@ def stream_chat(input_images, vlm_prompt=None, negative_vlm_prompt=None, seed=-1
     num_beams (int, optional): Number of beams for beam search. Default is 1.
 
     Returns:
-    str: Generated captions or error message
+    list: Generated captions or error messages
     """
     global clip_processor, clip_model, tokenizer, text_model, image_adapter
     
     if not all([clip_processor, clip_model, tokenizer, text_model, image_adapter]):
-        return "Error: Models not loaded. Please load a model first."
+        return ["Error: Models not loaded. Please load a model first."] * len(input_images)
 
     torch.cuda.empty_cache()
 

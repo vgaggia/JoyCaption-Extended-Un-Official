@@ -83,13 +83,12 @@ def batch_process_images(input_folder: str, batch_size: int, stream_chat_func, p
             
             if batch_images:
                 try:
-                    for idx, img in enumerate(batch_images):
+                    captions = stream_chat_func(batch_images)
+                    
+                    for idx, (caption, image_path) in enumerate(zip(captions, batch_image_paths)):
                         if interrupt_processing.is_set():
                             return f"Processing interrupted. Processed {processed_images}/{total_images} images (including {skipped_images} skipped)."
                         
-                        caption = stream_chat_func([img])[0]
-                        
-                        image_path = batch_image_paths[idx]
                         txt_filename = os.path.splitext(os.path.basename(image_path))[0] + '.txt'
                         txt_path = os.path.join(input_folder, txt_filename)
                         
