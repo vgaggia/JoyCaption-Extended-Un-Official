@@ -2,7 +2,8 @@
 
 ## Description
 JoyCaption is an image captioning application that uses advanced AI models to generate descriptive captions for images. This project is a heavily modified version of an original repository, adapted to use more recent models and technologies.
-If you would like to use the old version of this repo please switch your branch to alpha-1
+
+If you would like to use the old version of this repo please switch your branch to alpha-1.
 
 ## Features
 - Batch processing capabilities for multiple images
