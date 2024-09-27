@@ -27,7 +27,7 @@ If you would like to use the old version of this repo please switch your branch 
    ```
    install.bat
    ```
-   This script will create a virtual environment, install the necessary dependencies, and open a seperate command prompt window with instructionsto install PyTorch with the appropriate CUDA version for your system.
+   This script will create a virtual environment, install the necessary dependencies, and open a seperate command prompt window with instructions to install PyTorch with the appropriate CUDA version for your system.
 
 3. The required model files are already included in the `cgrkzexw-599808` folder. This folder contains:
    - `clip_model.pt`
