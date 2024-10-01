@@ -35,7 +35,7 @@ CAPTION_TYPE_MAP = {
         "Write a {length} descriptive caption for this image in a casual tone.",
     ],
     "Training Prompt": [
-        "Write a stable diffusion prompt for this image."
+        "Write a stable diffusion prompt for this image.",
         "Write a stable diffusion prompt for this image within {word_count} words.",
         "Write a {length} stable diffusion prompt for this image.",
     ],
