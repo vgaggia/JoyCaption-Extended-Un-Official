@@ -2,7 +2,8 @@
 
 ## Description
 JoyCaption is an image captioning application that uses advanced AI models to generate descriptive captions for images. This project is a heavily modified version of an original repository, adapted to use more recent models and technologies.
-If you would like to use the old version of this repo please switch your branch to alpha-1
+
+If you would like to use the old version of this repo please switch your branch to alpha-1.
 
 ## Features
 - Batch processing capabilities for multiple images
@@ -27,7 +28,7 @@ If you would like to use the old version of this repo please switch your branch 
    ```
    install.bat
    ```
-   This script will create a virtual environment, install the necessary dependencies, and open a seperate command prompt window with instructionsto install PyTorch with the appropriate CUDA version for your system.
+   This script will create a virtual environment, install the necessary dependencies, and open a seperate command prompt window with instructions to install PyTorch with the appropriate CUDA version for your system.
 
 3. The required model files are already included in the `cgrkzexw-599808` folder. This folder contains:
    - `clip_model.pt`
