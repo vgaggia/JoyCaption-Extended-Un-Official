@@ -159,9 +159,7 @@ assert isinstance(tokenizer, PreTrainedTokenizer) or isinstance(tokenizer, PreTr
 # Load language model
 print("Loading LLM")
 print("Loading VLM's custom text model")
-text_model = AutoModelForCausalLM.from_pretrained(CHECKPOINT_PATH / "text_model", device_map=0, torch_dtype=torch.bfloat16)
-text_model.eval()
-
+text_model = AutoModelForCausalLM.from_pretrained(CHECKPOINT_PATH / "text_model", torch_dtype=torch.bfloat16).to("cuda").eval()
 # Load image adapter
 print("Loading image adapter")
 image_adapter = ImageAdapter(clip_model.config.hidden_size, text_model.config.hidden_size, False, False, 38, False)
